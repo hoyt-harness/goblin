@@ -1,0 +1,6 @@
+# Normalize line endings
+* text=auto
+*.go text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+/hooks/* text eol=lf

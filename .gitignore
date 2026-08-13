@@ -1,0 +1,24 @@
+# Binary artifacts
+bin/
+rel/
+
+# Goblin temp files (dot-prefix convention)
+.audio.wav
+.whisper.json
+*.frame-meta
+
+# Output directories
+var/
+
+# Generated test fixtures (gen.sh is tracked; generated files are not)
+test/fixtures/*.mp4
+test/fixtures/*.mkv
+test/fixtures/*.wav
+test/fixtures/*.webm
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Profiling
+*.prof

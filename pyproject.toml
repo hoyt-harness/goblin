@@ -1,0 +1,8 @@
+[project]
+name = "goblin-config"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[tool.positronikal-check]
+# Exclude spec-kit tooling directory — pre-existing generated content.
+exclude-paths = [".specify"]
