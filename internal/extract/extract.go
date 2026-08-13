@@ -34,6 +34,10 @@ func Extract(input, outDir string, threshold float64) ([]Scene, []Frame, error) 
 	}
 	input = absInput
 
+	if err := os.MkdirAll(filepath.Join(outDir, "frames"), 0o755); err != nil {
+		return nil, nil, fmt.Errorf("create frames dir: %w", err)
+	}
+
 	// Run ffmpeg with outDir as the working directory so we can use relative paths
 	// inside the filtergraph, avoiding Windows drive-letter colons that conflict
 	// with ffmpeg's filtergraph option separator.

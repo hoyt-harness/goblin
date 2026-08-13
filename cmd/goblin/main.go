@@ -119,7 +119,7 @@ func run() int {
 			cfg.Output)
 		return 4
 	}
-	if err := os.MkdirAll(filepath.Join(cfg.Output, "frames"), 0o755); err != nil {
+	if err := os.MkdirAll(cfg.Output, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "goblin: error: cannot create output directory: %v\n", err)
 		return 4
 	}
