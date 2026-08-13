@@ -23,7 +23,7 @@ if command -v goimports >/dev/null 2>&1; then
 fi
 
 if command -v positronikal-check >/dev/null 2>&1; then
-    positronikal-check .
+    PYTHONIOENCODING=utf-8 positronikal-check .
     echo "  positronikal-check: OK"
 fi
 
