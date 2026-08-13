@@ -161,16 +161,21 @@ func WriteTranscript(outDir string, segs []transcribe.TranscriptSegment, meta tr
 	return os.WriteFile(filepath.Join(outDir, "transcript.json"), data, 0o644)
 }
 
-// VerifyFramePaths checks that every frame path referenced in the manifest exists on disk.
+// VerifyFramePaths checks that every frame and grid path referenced in the manifest exists on disk.
 func VerifyFramePaths(outDir string, m *Manifest) []string {
 	var warns []string
 	for _, sc := range m.Scenes {
-		if sc.Frame == "" {
-			continue
+		if sc.Frame != "" {
+			full := filepath.Join(outDir, filepath.FromSlash(sc.Frame))
+			if _, err := os.Stat(full); err != nil {
+				warns = append(warns, fmt.Sprintf("referenced frame missing: %s", sc.Frame))
+			}
 		}
-		full := filepath.Join(outDir, filepath.FromSlash(sc.Frame))
-		if _, err := os.Stat(full); err != nil {
-			warns = append(warns, fmt.Sprintf("referenced frame missing: %s", sc.Frame))
+		if sc.Grid != "" {
+			full := filepath.Join(outDir, filepath.FromSlash(sc.Grid))
+			if _, err := os.Stat(full); err != nil {
+				warns = append(warns, fmt.Sprintf("referenced grid missing: %s", sc.Grid))
+			}
 		}
 	}
 	return warns

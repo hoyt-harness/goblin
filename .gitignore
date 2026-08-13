@@ -1,6 +1,7 @@
 # Binary artifacts
 bin/
 rel/
+consumer_validate.exe
 
 # Goblin temp files (dot-prefix convention)
 .audio.wav

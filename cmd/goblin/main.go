@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hoyt-harness/goblin/internal/extract"
+	"github.com/hoyt-harness/goblin/internal/grid"
 	"github.com/hoyt-harness/goblin/internal/manifest"
 	"github.com/hoyt-harness/goblin/internal/probe"
 	"github.com/hoyt-harness/goblin/internal/transcribe"
@@ -113,15 +114,9 @@ func run() int {
 		base := strings.TrimSuffix(filepath.Base(inputFile), filepath.Ext(inputFile))
 		cfg.Output = filepath.Join(filepath.Dir(inputFile), base+"_goblin")
 	}
-	if _, err := os.Stat(cfg.Output); err == nil && !cfg.Overwrite {
-		fmt.Fprintf(os.Stderr,
-			"goblin: error: output directory already exists: %s\n  Use -overwrite to replace it\n",
-			cfg.Output)
-		return 4
-	}
-	if err := os.MkdirAll(cfg.Output, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "goblin: error: cannot create output directory: %v\n", err)
-		return 4
+	if code, setupErr := setupOutputDir(cfg.Output, cfg.Overwrite); code != 0 {
+		fmt.Fprintf(os.Stderr, "goblin: error: %v\n", setupErr)
+		return code
 	}
 
 	// Pipeline.
@@ -167,12 +162,13 @@ func run() int {
 		return 0
 	}
 
-	// Stage: extract.
+	// Stage: extract (and grid, if enabled).
 	var scenes []extract.Scene
+	var gridPaths []string
 	if !cfg.NoFrames && pr.HasVideo {
 		progress(cfg.Quiet, "goblin: extract  threshold %.2f", cfg.Threshold)
 		var err error
-		scenes, _, err = extract.Extract(absInput, cfg.Output, cfg.Threshold)
+		scenes, _, err = extract.Extract(absInput, cfg.Output, cfg.Threshold, cfg.Threads)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "goblin: error: extract failed: %v\n", err)
 			return 2
@@ -184,6 +180,18 @@ func run() int {
 			m.Warnings = append(m.Warnings, msg)
 		}
 		m.StagesRun = append(m.StagesRun, "extract")
+
+		// Stage: grid (runs immediately after extract while frames are fresh).
+		if cfg.Grid {
+			progress(cfg.Quiet, "goblin: grid  %dx%d per page", cfg.GridCols, cfg.GridCols)
+			var gridErr error
+			gridPaths, gridErr = grid.Grid(cfg.Output, cfg.GridCols)
+			if gridErr != nil {
+				fmt.Fprintf(os.Stderr, "goblin: error: grid failed: %v\n", gridErr)
+				return 2
+			}
+			m.StagesRun = append(m.StagesRun, "grid")
+		}
 	} else if !pr.HasVideo && !cfg.NoFrames {
 		msg := "no video stream, skipping frame extraction"
 		fmt.Fprintf(os.Stderr, "goblin: warning: %s\n", msg)
@@ -218,6 +226,26 @@ func run() int {
 
 	// Build scene refs with end_s values and transcript cross-links.
 	m.Scenes = manifest.BuildSceneRefs(scenes, segments, pr.DurationS)
+
+	// Assign each scene to its grid page using frame filename position in sorted order,
+	// matching the order ffmpeg consumed frames during grid generation.
+	if cfg.Grid && len(gridPaths) > 0 {
+		frameNames, _ := grid.SortedFrameNames(cfg.Output)
+		framePosMap := make(map[string]int, len(frameNames))
+		for i, name := range frameNames {
+			framePosMap[name] = i
+		}
+		pageSize := cfg.GridCols * cfg.GridCols
+		for i := range m.Scenes {
+			base := filepath.Base(filepath.FromSlash(m.Scenes[i].Frame))
+			if pos, ok := framePosMap[base]; ok {
+				page := pos / pageSize
+				if page < len(gridPaths) {
+					m.Scenes[i].Grid = gridPaths[page]
+				}
+			}
+		}
+	}
 
 	if err := manifest.WriteManifest(cfg.Output, m); err != nil {
 		fmt.Fprintf(os.Stderr, "goblin: error: %v\n", err)
@@ -262,4 +290,16 @@ func progress(quiet bool, format string, args ...any) {
 	if !quiet {
 		fmt.Printf(format+"\n", args...)
 	}
+}
+
+// setupOutputDir validates and creates the output directory.
+// Returns (exit code, error) — code 0 on success, 4 on failure.
+func setupOutputDir(output string, overwrite bool) (int, error) {
+	if _, err := os.Stat(output); err == nil && !overwrite {
+		return 4, fmt.Errorf("output directory already exists: %s\n  Use -overwrite to replace it", output)
+	}
+	if err := os.MkdirAll(output, 0o755); err != nil {
+		return 4, fmt.Errorf("cannot create output directory: %v", err)
+	}
+	return 0, nil
 }

@@ -18,7 +18,7 @@ func TestExtractFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	scenes, frames, err := Extract(fixturePath, outDir, 0.4)
+	scenes, frames, err := Extract(fixturePath, outDir, 0.4, 0)
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}

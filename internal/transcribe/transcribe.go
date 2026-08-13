@@ -45,7 +45,11 @@ func runWhisper(input, outDir, whisperCmd, model string, threads int) ([]Transcr
 	inputFwd := filepath.ToSlash(input)
 
 	// Extract audio as 16kHz mono PCM for whisper.
-	args := []string{
+	var audioArgs []string
+	if threads > 0 {
+		audioArgs = append(audioArgs, "-threads", fmt.Sprintf("%d", threads))
+	}
+	audioArgs = append(audioArgs,
 		"-i", inputFwd,
 		"-vn",
 		"-acodec", "pcm_s16le",
@@ -54,8 +58,8 @@ func runWhisper(input, outDir, whisperCmd, model string, threads int) ([]Transcr
 		"-loglevel", "error",
 		"-y",
 		audioFwd,
-	}
-	if out, err := exec.Command("ffmpeg", args...).CombinedOutput(); err != nil {
+	)
+	if out, err := exec.Command("ffmpeg", audioArgs...).CombinedOutput(); err != nil {
 		return nil, TranscriptMeta{}, fmt.Errorf("audio extraction: %w\n%s", err, out)
 	}
 	defer os.Remove(audioPath)

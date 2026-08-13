@@ -31,7 +31,50 @@ Generate test fixture: `bash test/fixtures/gen.sh`
 - `internal/extract/` — ffmpeg scene detection and frame extraction
 - `internal/transcribe/` — whisper subprocess and SRT subtitle extraction
 - `internal/manifest/` — writes MANIFEST.json, probe.json, transcript.json
+- `internal/grid/` — ffmpeg tile filter; produces contact sheet grids from frames
 - `specs/001-core-pipeline/` — full spec-kit (spec, plan, tasks, contracts)
+
+## Flags (summary)
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `-model PATH` | `$GOBLIN_WHISPER_MODEL` | Whisper model file |
+| `-output DIR` | `<file>_goblin/` | Output directory |
+| `-threshold N` | `0.4` | Scene detection sensitivity (0–1) |
+| `-probe-only` | false | Probe + probe.json only; skip extract/transcribe/grid |
+| `-no-frames` | false | Skip frame extraction |
+| `-no-transcript` | false | Skip transcription |
+| `-prefer-whisper` | false | Use whisper even when embedded subtitles exist |
+| `-overwrite` | false | Replace existing output directory |
+| `-grid` | false | Produce contact sheet grid images in `grids/` |
+| `-grid-cols N` | 4 | Columns per grid page (rows = cols, square pages) |
+| `-frame-warn N` | 50 | Warn when frame count exceeds N |
+| `-threads N` | 0 | Thread count for ffmpeg and whisper (0 = auto) |
+| `-quiet` | false | Suppress progress lines |
+| `-whisper-cmd NAME` | `$GOBLIN_WHISPER_CMD` or `whisper-cli` | Whisper binary |
+| `-version` | — | Print version and exit 0 |
+
+## Output structure
+
+```
+<file>_goblin/
+  MANIFEST.json   — top-level index (scenes, stages_run, warnings)
+  probe.json      — ffprobe stream and format metadata
+  transcript.json — whisper/subtitle segments (omitted with -no-transcript)
+  frames/
+    frame_00001.png  — one PNG per detected scene change
+    ...
+  grids/             — only with -grid
+    grid_001.png     — contact sheet, cols×cols frames per page
+    ...
+```
+
+## Grid mode
+
+`-grid` tiles all extracted frames into contact sheets using ffmpeg's `tile`
+filter. Page size = `grid-cols × grid-cols` (default 16 frames per sheet).
+Each scene's `grid` field in MANIFEST.json references the sheet containing
+its frame. Partial last pages are always written (never dropped).
 
 ## Known limitations
 
