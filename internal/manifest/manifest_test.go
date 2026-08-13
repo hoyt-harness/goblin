@@ -123,6 +123,20 @@ func TestRelativePathsForwardSlash(t *testing.T) {
 	}
 }
 
+func TestBuildSceneRefsSceneScore(t *testing.T) {
+	scenes := []extract.Scene{
+		{Index: 0, StartS: 0, FramePath: "frames/frame_00001.png", SceneScore: 0.72},
+		{Index: 1, StartS: 5.0, FramePath: "frames/frame_00002.png", SceneScore: 0.45},
+	}
+	refs := BuildSceneRefs(scenes, nil, 10.0)
+	if refs[0].SceneScore != 0.72 {
+		t.Errorf("refs[0].SceneScore = %.2f, want 0.72", refs[0].SceneScore)
+	}
+	if refs[1].SceneScore != 0.45 {
+		t.Errorf("refs[1].SceneScore = %.2f, want 0.45", refs[1].SceneScore)
+	}
+}
+
 func contains(slice []int, v int) bool {
 	for _, x := range slice {
 		if x == v {

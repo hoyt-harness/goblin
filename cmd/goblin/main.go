@@ -293,10 +293,17 @@ func progress(quiet bool, format string, args ...any) {
 }
 
 // setupOutputDir validates and creates the output directory.
+// When overwrite is true and the directory exists, it is removed before recreation
+// so the run starts with a clean slate — no stale frames or grids from prior runs.
 // Returns (exit code, error) — code 0 on success, 4 on failure.
 func setupOutputDir(output string, overwrite bool) (int, error) {
-	if _, err := os.Stat(output); err == nil && !overwrite {
-		return 4, fmt.Errorf("output directory already exists: %s\n  Use -overwrite to replace it", output)
+	if _, err := os.Stat(output); err == nil {
+		if !overwrite {
+			return 4, fmt.Errorf("output directory already exists: %s\n  Use -overwrite to replace it", output)
+		}
+		if err := os.RemoveAll(output); err != nil {
+			return 4, fmt.Errorf("cannot remove existing output directory: %v", err)
+		}
 	}
 	if err := os.MkdirAll(output, 0o755); err != nil {
 		return 4, fmt.Errorf("cannot create output directory: %v", err)

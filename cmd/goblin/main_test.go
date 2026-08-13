@@ -3,6 +3,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -32,9 +33,20 @@ func TestSetupOutputDirExistingNoOverwrite(t *testing.T) {
 
 func TestSetupOutputDirExistingWithOverwrite(t *testing.T) {
 	dir := t.TempDir()
+	// Seed a file to verify -overwrite produces a clean directory, not just recreates.
+	sentinel := filepath.Join(dir, "stale_frame.png")
+	if err := os.WriteFile(sentinel, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	code, err := setupOutputDir(dir, true)
 	if code != 0 || err != nil {
 		t.Errorf("existing dir with -overwrite: got code=%d err=%v; want code=0 err=nil", code, err)
+	}
+	if _, statErr := os.Stat(dir); statErr != nil {
+		t.Errorf("directory missing after overwrite: %v", statErr)
+	}
+	if _, statErr := os.Stat(sentinel); statErr == nil {
+		t.Error("stale file survived -overwrite; -overwrite must produce a clean directory")
 	}
 }
 

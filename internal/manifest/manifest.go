@@ -21,6 +21,7 @@ type SceneRef struct {
 	EndS               float64 `json:"end_s"`
 	Frame              string  `json:"frame"`
 	Grid               string  `json:"grid"`
+	SceneScore         float64 `json:"scene_score"`
 	TranscriptSegments []int   `json:"transcript_segments"`
 }
 
@@ -77,6 +78,7 @@ func BuildSceneRefs(scenes []extract.Scene, segs []transcribe.TranscriptSegment,
 				EndS:               durationS,
 				Frame:              "",
 				Grid:               "",
+				SceneScore:         0,
 				TranscriptSegments: []int{},
 			},
 		}
@@ -108,6 +110,7 @@ func BuildSceneRefs(scenes []extract.Scene, segs []transcribe.TranscriptSegment,
 			EndS:               endS,
 			Frame:              path.Join("frames", filepath.Base(sc.FramePath)),
 			Grid:               "",
+			SceneScore:         sc.SceneScore,
 			TranscriptSegments: overlapping,
 		}
 	}
