@@ -4,6 +4,7 @@ package extract
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -18,7 +19,7 @@ func TestExtractFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	scenes, frames, err := Extract(fixturePath, outDir, 0.4, 0)
+	scenes, frames, err := Extract(fixturePath, outDir, 0.4, 0, 0)
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}
@@ -110,5 +111,32 @@ lavfi.scene_score=0.610000
 	}
 	if frames[2].filename != "frame_00003.png" {
 		t.Errorf("frame[2].filename = %q, want frame_00003.png", frames[2].filename)
+	}
+}
+
+func TestBuildFilterNoScale(t *testing.T) {
+	f := buildFilter(0.4, ".meta", 0)
+	if strings.Contains(f, "scale=") {
+		t.Errorf("filter with maxDim=0 should not contain scale filter, got: %s", f)
+	}
+	if !strings.Contains(f, "select=") {
+		t.Errorf("filter should contain scene detection select, got: %s", f)
+	}
+}
+
+func TestBuildFilterWithScale(t *testing.T) {
+	f := buildFilter(0.4, ".meta", 1280)
+	if !strings.Contains(f, "scale=1280:1280:force_original_aspect_ratio=decrease:flags=lanczos") {
+		t.Errorf("filter with maxDim=1280 should contain scale filter, got: %s", f)
+	}
+}
+
+func TestBuildFilterScaleNotAdded(t *testing.T) {
+	// maxDim=0 is the "no limit" sentinel — verify scale is absent regardless of threshold.
+	for _, threshold := range []float64{0.1, 0.4, 0.9} {
+		f := buildFilter(threshold, ".meta", 0)
+		if strings.Contains(f, "scale=") {
+			t.Errorf("buildFilter(%.1f, ..., 0) should not contain scale=, got: %s", threshold, f)
+		}
 	}
 }

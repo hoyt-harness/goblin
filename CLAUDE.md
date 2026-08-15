@@ -33,6 +33,7 @@ Generate test fixture: `bash test/fixtures/gen.sh`
 - `internal/manifest/` — writes MANIFEST.json, probe.json, transcript.json
 - `internal/grid/` — ffmpeg tile filter; produces contact sheet grids from frames
 - `specs/001-core-pipeline/` — full spec-kit (spec, plan, tasks, contracts)
+- `specs/002-output-control/` — frame-max-dim and grid-rows spec-kit
 
 ## Flags (summary)
 
@@ -47,7 +48,9 @@ Generate test fixture: `bash test/fixtures/gen.sh`
 | `-prefer-whisper` | false | Use whisper even when embedded subtitles exist |
 | `-overwrite` | false | Replace existing output directory |
 | `-grid` | false | Produce contact sheet grid images in `grids/` |
-| `-grid-cols N` | 4 | Columns per grid page (rows = cols, square pages) |
+| `-grid-cols N` | 4 | Columns per grid page |
+| `-grid-rows N` | 0 | Rows per grid page (0 = same as cols, square pages) |
+| `-frame-max-dim N` | 0 | Cap longest frame edge in pixels; 0 = no limit; never upscales |
 | `-frame-warn N` | 50 | Warn when frame count exceeds N |
 | `-threads N` | 0 | Thread count for ffmpeg and whisper (0 = auto) |
 | `-quiet` | false | Suppress progress lines |
@@ -72,9 +75,22 @@ Generate test fixture: `bash test/fixtures/gen.sh`
 ## Grid mode
 
 `-grid` tiles all extracted frames into contact sheets using ffmpeg's `tile`
-filter. Page size = `grid-cols × grid-cols` (default 16 frames per sheet).
-Each scene's `grid` field in MANIFEST.json references the sheet containing
-its frame. Partial last pages are always written (never dropped).
+filter. Default page size = `grid-cols × grid-cols` (square, 16 frames per
+sheet with the default cols=4). Use `-grid-rows N` for rectangular pages —
+e.g. `-grid-cols 8 -grid-rows 3` yields 24 frames per sheet, which fills
+a 16:9 contact image more efficiently. Each scene's `grid` field in
+MANIFEST.json references the sheet containing its frame. Partial last pages
+are always written (never dropped).
+
+## Frame dimension cap
+
+`-frame-max-dim N` scales extracted frames so the longest edge is ≤ N pixels.
+Aspect ratio is preserved. Goblin never upscales — if the source is already
+smaller than N, frames are written at native resolution. Token cost to Claude
+is determined by pixel dimensions, not file size; this flag is the primary
+lever for fitting long or high-resolution video into a context window.
+Example: `-frame-max-dim 1280` reduces a 4K frame from ~30,000 tokens to
+~3,000 tokens — a 10× reduction.
 
 ## Known limitations
 

@@ -34,8 +34,10 @@ type Manifest struct {
 	StagesRun      []string   `json:"stages_run"`
 	ProbePath      string     `json:"probe_path"`
 	TranscriptPath string     `json:"transcript_path,omitempty"`
+	FrameMaxDim    int        `json:"frame_max_dim,omitempty"`
 	GridMode       bool       `json:"grid_mode"`
 	GridCols       int        `json:"grid_cols"`
+	GridRows       int        `json:"grid_rows,omitempty"`
 	Scenes         []SceneRef `json:"scenes"`
 	Warnings       []string   `json:"warnings"`
 }

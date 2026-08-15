@@ -99,6 +99,42 @@ per page). Each scene's `grid` field in `MANIFEST.json` references the sheet
 containing its frame. Useful for visual review of long videos without opening
 every individual frame.
 
+Use `-grid-rows` to make rectangular pages that match the source aspect ratio
+(see example 6).
+
+### 6. Frame dimension cap — reduce token cost for high-resolution video
+
+```sh
+goblin -frame-max-dim 1280 -no-transcript lecture_4k.mp4
+```
+
+Scales all extracted frames so the longest edge is ≤ 1280 pixels, preserving
+aspect ratio. For a 4K (3840×2160) source this reduces each frame from ~30,000
+tokens to ~3,000 tokens when read by Claude — a 10× reduction. Goblin never
+upscales; sources already smaller than the cap are written at native resolution.
+
+`MANIFEST.json` will contain `"frame_max_dim": 1280` when the flag is set.
+
+### 7. Rectangular grid pages
+
+```sh
+goblin -grid -grid-cols 8 -grid-rows 3 -no-transcript long_film.mp4
+```
+
+Produces contact sheets with 8 columns and 3 rows (24 frames per page) instead
+of the default square layout. This fills the sheet image more efficiently for
+widescreen content. Most useful in combination with `-frame-max-dim`:
+
+```sh
+goblin -frame-max-dim 640 -grid -grid-cols 8 -grid-rows 3 -no-transcript long_film.mp4
+```
+
+Small frames at 8×3 = 24 per sheet means each contact image is compact and
+costs fewer tokens for the same scene coverage.
+
+`MANIFEST.json` will contain `"grid_rows": 3` when explicitly set.
+Omitted when using default square pages (`grid_rows == grid_cols`).
+
 ### 5. Embedded subtitle extraction (MKV files)
 
 ```sh
@@ -128,7 +164,9 @@ goblin -prefer-whisper -model /path/to/model.bin subtitled.mkv
 | `-prefer-whisper` | false | Use whisper even when embedded subtitles exist |
 | `-overwrite` | false | Replace an existing output directory |
 | `-grid` | false | Produce contact sheet grid images |
-| `-grid-cols N` | 4 | Columns per grid page (rows = cols) |
+| `-grid-cols N` | 4 | Columns per grid page |
+| `-grid-rows N` | 0 | Rows per grid page (0 = same as cols, square pages) |
+| `-frame-max-dim N` | 0 | Cap longest frame edge in pixels; 0 = no limit; never upscales |
 | `-frame-warn N` | 50 | Warn when frame count exceeds N |
 | `-threads N` | 0 | Thread count hint for ffmpeg and whisper (0 = auto) |
 | `-whisper-cmd NAME` | `whisper-cli` or `$GOBLIN_WHISPER_CMD` | Whisper binary |
@@ -166,28 +204,34 @@ relative to the output directory and use forward slashes on all platforms.
 ```json
 {
   "schema_version": "1",
-  "goblin_version": "0.1.0",
-  "generated_at": "2026-08-13T12:00:00Z",
+  "goblin_version": "0.2.0",
+  "generated_at": "2026-08-14T12:00:00Z",
   "source_path": "/abs/path/to/input.mp4",
   "duration_s": 169.4,
   "stages_run": ["probe", "extract", "transcribe"],
   "probe_path": "probe.json",
   "transcript_path": "transcript.json",
-  "grid_mode": false,
-  "grid_cols": 0,
+  "frame_max_dim": 1280,
+  "grid_mode": true,
+  "grid_cols": 8,
+  "grid_rows": 3,
   "scenes": [
     {
       "index": 0,
       "start_s": 0.0,
       "end_s": 12.3,
       "frame": "frames/frame_00001.png",
-      "grid": "",
+      "grid": "grids/grid_001.png",
+      "scene_score": 0.72,
       "transcript_segments": [0, 1, 2]
     }
   ],
   "warnings": []
 }
 ```
+
+`frame_max_dim` and `grid_rows` are omitted when their values equal the
+defaults (0), to avoid uninformative zero fields in the common case.
 
 `transcript_segments` is a list of indices into `transcript.json`'s `segments`
 array. All indices are guaranteed in-bounds when the manifest is written.

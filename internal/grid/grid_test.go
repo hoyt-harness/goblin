@@ -55,7 +55,7 @@ func TestGridNoFrames(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(outDir, "frames"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	paths, err := Grid(outDir, 4)
+	paths, err := Grid(outDir, 4, 0)
 	if err != nil {
 		t.Fatalf("Grid on empty frames dir: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestGridSinglePage(t *testing.T) {
 	outDir := t.TempDir()
 	seedFrames(t, outDir, 5) // 5 frames, cols=4 → 1 page (4×4, partial)
 
-	paths, err := Grid(outDir, 4)
+	paths, err := Grid(outDir, 4, 0)
 	if err != nil {
 		t.Fatalf("Grid: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestGridMultiPage(t *testing.T) {
 	outDir := t.TempDir()
 	seedFrames(t, outDir, nFrames)
 
-	paths, err := Grid(outDir, cols)
+	paths, err := Grid(outDir, cols, 0)
 	if err != nil {
 		t.Fatalf("Grid: %v", err)
 	}
@@ -118,6 +118,70 @@ func TestGridMultiPage(t *testing.T) {
 		if info.Size() == 0 {
 			t.Errorf("grid file %q is empty", p)
 		}
+	}
+}
+
+func TestGridRectangular(t *testing.T) {
+	if !ffmpegAvailable() {
+		t.Skip("ffmpeg not on PATH")
+	}
+	const (
+		cols    = 6
+		rows    = 3
+		nFrames = 20 // 1 full 6×3 page (18 frames) + 1 partial page (2 frames)
+	)
+	outDir := t.TempDir()
+	seedFrames(t, outDir, nFrames)
+
+	paths, err := Grid(outDir, cols, rows)
+	if err != nil {
+		t.Fatalf("Grid(cols=%d, rows=%d): %v", cols, rows, err)
+	}
+	wantPages := 2
+	if len(paths) != wantPages {
+		t.Errorf("expected %d grid files for %d frames (cols=%d rows=%d), got %d: %v",
+			wantPages, nFrames, cols, rows, len(paths), paths)
+	}
+	for _, p := range paths {
+		full := filepath.Join(outDir, filepath.FromSlash(p))
+		info, err := os.Stat(full)
+		if err != nil {
+			t.Errorf("grid file %q missing: %v", p, err)
+			continue
+		}
+		if info.Size() == 0 {
+			t.Errorf("grid file %q is empty", p)
+		}
+	}
+}
+
+func TestGridSquareDefault(t *testing.T) {
+	if !ffmpegAvailable() {
+		t.Skip("ffmpeg not on PATH")
+	}
+	// rows=0 should produce the same page count as rows=cols (square).
+	const (
+		cols    = 4
+		nFrames = 17 // same as TestGridMultiPage
+	)
+	outDir := t.TempDir()
+	seedFrames(t, outDir, nFrames)
+
+	pathsDefault, err := Grid(outDir, cols, 0)
+	if err != nil {
+		t.Fatalf("Grid(rows=0): %v", err)
+	}
+
+	outDir2 := t.TempDir()
+	seedFrames(t, outDir2, nFrames)
+	pathsExplicit, err := Grid(outDir2, cols, cols)
+	if err != nil {
+		t.Fatalf("Grid(rows=cols): %v", err)
+	}
+
+	if len(pathsDefault) != len(pathsExplicit) {
+		t.Errorf("rows=0 produced %d pages, rows=cols produced %d pages — should be equal",
+			len(pathsDefault), len(pathsExplicit))
 	}
 }
 

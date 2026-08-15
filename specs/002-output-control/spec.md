@@ -60,7 +60,9 @@ more content per image.
 **Why this priority**: Grid mode is already implemented. Adding `-grid-rows`
 is a small, isolated change to one ffmpeg tile filter call and requires no
 external dependencies. It directly improves how grid pages are laid out for
-the most common source format (widescreen video).
+the most common source format (widescreen video). Most useful in combination
+with `-frame-max-dim`: small frames + rectangular layout maximizes frames
+visible per context image.
 
 **Independent Test**: Can be fully tested by running goblin with
 `-grid -grid-cols 8 -grid-rows 4` and verifying that grid pages contain
@@ -86,54 +88,11 @@ up to 32 frames in an 8-wide, 4-tall layout.
 
 ---
 
-### User Story 3 — JPEG Frame Format for Storage Efficiency (Priority: P3)
-
-As a practitioner archiving goblin output or processing it across a slow
-connection, I need the option to store extracted frames in JPEG format rather
-than lossless PNG. A typical 1280px-wide scene frame in PNG is 800 KB–2 MB;
-the same frame as JPEG at quality 3 is 40–150 KB — a 5–15× reduction. The
-token cost to Claude is identical (pixel dimensions determine token count, not
-codec), so JPEG is strictly preferable for throughput-constrained workflows
-where token budget is not the binding constraint.
-
-**Why this priority**: This is a storage and transfer optimization, not a
-context-efficiency optimization. It matters for long-video pipelines where
-disk or network is the bottleneck, but it does not change how many frames
-Claude can see per context window. Lower priority than the dimension cap.
-
-**Independent Test**: Can be fully tested by running goblin with
-`-frame-format jpg` and verifying that all frame files in `frames/` carry
-the `.jpg` extension, that frame paths in MANIFEST.json use `.jpg`, and that
-grid images correctly read from `.jpg` inputs.
-
-**Acceptance Scenarios**:
-
-1. **Given** goblin invoked with `-frame-format jpg`, **When** frames are
-   extracted, **Then** all files in `frames/` have the `.jpg` extension,
-   MANIFEST.json scene `frame` paths reference `.jpg` files, and every
-   referenced file exists on disk.
-
-2. **Given** goblin invoked with `-frame-format jpg -frame-quality 5`,
-   **When** frames are extracted, **Then** files are JPEG-encoded at ffmpeg
-   quality level 5 (lower = higher quality in ffmpeg's scale).
-
-3. **Given** goblin invoked with `-frame-format jpg` and `-grid` enabled,
-   **When** grid contact sheets are produced, **Then** the grid reads from
-   `.jpg` frame files correctly and grid output files remain `.png`.
-
-4. **Given** goblin invoked with no `-frame-format` flag, **When** any source
-   is analyzed, **Then** frame files are PNG — default behavior is unchanged.
-
----
-
 ### Edge Cases
 
 - What happens when `-frame-max-dim` is set and `-grid` is also enabled? The
   grid reads from the dimension-capped frames. Grid output dimensions will be
   smaller than if no cap were applied; this is correct and expected behavior.
-- What happens when `-frame-quality` is specified but `-frame-format` is `png`?
-  goblin MUST emit a warning that `-frame-quality` has no effect for PNG and
-  proceed normally — PNG is always lossless.
 - What happens when `-grid-rows 1 -grid-cols 1`? Each frame gets its own
   "grid" page — functionally equivalent to no grid, but still valid. goblin
   MUST accept this.
@@ -156,30 +115,13 @@ grid images correctly read from `.jpg` inputs.
 - **FR-003**: goblin MUST accept `-grid-rows N` (integer ≥ 0) to set the
   number of rows per grid page independently of the number of columns. When
   N = 0 (default), rows = cols (square pages, preserving current behavior).
-- **FR-004**: goblin MUST accept `-frame-format png|jpg` to select the codec
-  for extracted frames. Default is `png`.
-- **FR-005**: goblin MUST accept `-frame-quality N` (integer 1–31, default 3)
-  to set the ffmpeg JPEG quality level when `-frame-format jpg` is selected.
-  Lower N = higher quality in ffmpeg's scale.
-- **FR-006**: When `-frame-format jpg` is used, goblin MUST write frame files
-  with the `.jpg` extension, and all MANIFEST.json frame path references MUST
-  use the `.jpg` extension.
-- **FR-007**: When `-frame-format jpg` is used and `-grid` is also enabled,
-  the grid tile filter MUST read from `.jpg` frame files. Grid output files
-  remain `.png` regardless of frame format.
-- **FR-008**: goblin MUST emit a warning to stderr when `-frame-quality` is
-  specified alongside `-frame-format png`.
-- **FR-009**: All existing Quickstart Scenarios (1–7) MUST continue to pass
+- **FR-004**: All existing Quickstart Scenarios (1–7) MUST continue to pass
   without modification when none of the new flags are specified.
 
 ### Key Entities
 
-- **Frame max dimension**: An integer cap on the longest edge of a frame PNG
-  or JPEG. Applies at the ffmpeg scale filter level, not post-extraction.
-- **Frame format**: The image codec used for scene keyframes. Either `png`
-  (lossless, larger) or `jpg` (lossy, smaller). Does not affect grid output.
-- **Frame quality**: The ffmpeg `-q:v` value for JPEG encoding. Range 1–31;
-  lower is higher quality. Meaningless for PNG.
+- **Frame max dimension**: An integer cap on the longest edge of an extracted
+  frame PNG. Applies at the ffmpeg scale filter level, not post-extraction.
 - **Grid rows**: The number of rows per grid page. Independent of `grid-cols`.
   When 0, rows = cols (square pages).
 
@@ -194,32 +136,21 @@ grid images correctly read from `.jpg` inputs.
   exactly 8 columns and 4 rows per full page, verifiable by inspecting grid
   image dimensions (width = 8 × frame_width, height = 4 × frame_height,
   approximately).
-- **SC-003**: A `-frame-format jpg` run produces JPEG files whose on-disk size
-  is < 30% of the equivalent PNG for the same source — confirming real
-  compression, not just a renamed file.
-- **SC-004**: All seven existing Quickstart Scenarios exit 0 with no new flags
+- **SC-003**: All seven existing Quickstart Scenarios exit 0 with no new flags
   specified after 002 is implemented — no regressions.
-- **SC-005**: A full pipeline with `-frame-max-dim 1280 -frame-format jpg -grid
-  -grid-cols 6 -grid-rows 3` exits 0 and produces a valid MANIFEST.json
-  referencing only `.jpg` frame files and `.png` grid files, all of which
-  exist on disk.
+- **SC-004**: A full pipeline with `-frame-max-dim 1280 -grid -grid-cols 6
+  -grid-rows 3` exits 0 and produces a valid MANIFEST.json containing
+  `frame_max_dim` and `grid_rows` fields, with all referenced frame and grid
+  files existing on disk.
 
 ## Assumptions
 
 - The source of truth for image token cost is pixel dimensions, not file bytes.
   JPEG and PNG at the same pixel dimensions cost the same number of tokens
-  when read by Claude. This is why `-frame-max-dim` is prioritized over codec
-  selection as the context-efficiency lever.
+  when read by Claude. This is why `-frame-max-dim` is the sole output control
+  implemented in 002; JPEG support addresses a different (disk/transfer) problem
+  and is deferred to a future spec.
 - ffmpeg's `scale` filter with `force_original_aspect_ratio=decrease` correctly
   handles the no-upscale constraint without additional application logic.
-- JPEG quality level 3 on ffmpeg's `-q:v` scale produces quality suitable for
-  scene recognition tasks. Users with specific quality requirements can override
-  via `-frame-quality`.
-- WebP support (`libwebp`) is available on the primary workstation but is
-  deferred from 002 because WebP and JPEG use opposite quality scale
-  conventions in ffmpeg (`-q:v` is inverted), making a unified `-frame-quality`
-  flag ambiguous. WebP will be a separate spec.
-- Grid output files remain `.png` regardless of frame format; they are freshly
-  rendered composite images, not recompressed inputs.
 - Batch processing (multiple input files), URL input, and stream selection
   remain future extensions beyond 002 scope.

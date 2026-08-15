@@ -32,6 +32,8 @@ type Config struct {
 	Model         string
 	Grid          bool
 	GridCols      int
+	GridRows      int
+	FrameMaxDim   int
 	FrameWarn     int
 	Threads       int
 	Quiet         bool
@@ -56,6 +58,8 @@ func run() int {
 	flag.StringVar(&cfg.Model, "model", "", "Whisper model file path (overrides GOBLIN_WHISPER_MODEL)")
 	flag.BoolVar(&cfg.Grid, "grid", false, "Produce contact sheet grid images")
 	flag.IntVar(&cfg.GridCols, "grid-cols", 4, "Columns per grid sheet")
+	flag.IntVar(&cfg.GridRows, "grid-rows", 0, "Rows per grid sheet (0 = same as cols, square pages)")
+	flag.IntVar(&cfg.FrameMaxDim, "frame-max-dim", 0, "Cap longest frame edge in pixels; 0 = no limit; never upscales")
 	flag.IntVar(&cfg.FrameWarn, "frame-warn", 50, "Warn if output frame count exceeds N")
 	flag.IntVar(&cfg.Threads, "threads", 0, "Thread count hint for ffmpeg and whisper (0 = auto)")
 	flag.BoolVar(&cfg.Quiet, "quiet", false, "Suppress progress lines; errors and warnings always print")
@@ -72,6 +76,16 @@ func run() int {
 	if showVersion {
 		fmt.Println(version)
 		return 0
+	}
+
+	// Validate new numeric flags.
+	if cfg.FrameMaxDim < 0 {
+		fmt.Fprintf(os.Stderr, "goblin: error: -frame-max-dim must be ≥ 0, got %d\n", cfg.FrameMaxDim)
+		return 1
+	}
+	if cfg.GridRows < 0 {
+		fmt.Fprintf(os.Stderr, "goblin: error: -grid-rows must be ≥ 0, got %d\n", cfg.GridRows)
+		return 1
 	}
 
 	// Env var resolution — flag takes precedence over env.
@@ -168,7 +182,7 @@ func run() int {
 	if !cfg.NoFrames && pr.HasVideo {
 		progress(cfg.Quiet, "goblin: extract  threshold %.2f", cfg.Threshold)
 		var err error
-		scenes, _, err = extract.Extract(absInput, cfg.Output, cfg.Threshold, cfg.Threads)
+		scenes, _, err = extract.Extract(absInput, cfg.Output, cfg.Threshold, cfg.Threads, cfg.FrameMaxDim)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "goblin: error: extract failed: %v\n", err)
 			return 2
@@ -185,7 +199,7 @@ func run() int {
 		if cfg.Grid {
 			progress(cfg.Quiet, "goblin: grid  %dx%d per page", cfg.GridCols, cfg.GridCols)
 			var gridErr error
-			gridPaths, gridErr = grid.Grid(cfg.Output, cfg.GridCols)
+			gridPaths, gridErr = grid.Grid(cfg.Output, cfg.GridCols, cfg.GridRows)
 			if gridErr != nil {
 				fmt.Fprintf(os.Stderr, "goblin: error: grid failed: %v\n", gridErr)
 				return 2
@@ -235,7 +249,11 @@ func run() int {
 		for i, name := range frameNames {
 			framePosMap[name] = i
 		}
-		pageSize := cfg.GridCols * cfg.GridCols
+		effectiveGridRows := cfg.GridRows
+		if effectiveGridRows == 0 {
+			effectiveGridRows = cfg.GridCols
+		}
+		pageSize := cfg.GridCols * effectiveGridRows
 		for i := range m.Scenes {
 			base := filepath.Base(filepath.FromSlash(m.Scenes[i].Frame))
 			if pos, ok := framePosMap[base]; ok {
@@ -245,6 +263,13 @@ func run() int {
 				}
 			}
 		}
+	}
+
+	if cfg.FrameMaxDim > 0 {
+		m.FrameMaxDim = cfg.FrameMaxDim
+	}
+	if cfg.Grid && cfg.GridRows > 0 {
+		m.GridRows = cfg.GridRows
 	}
 
 	if err := manifest.WriteManifest(cfg.Output, m); err != nil {

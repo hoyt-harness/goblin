@@ -3,7 +3,7 @@
 **Date**: 2026-08-13
 **Branch**: `002-output-control`
 
-These scenarios test the three new flags from 002. Run all seven existing
+These scenarios test the two new flags from 002. Run all seven existing
 Quickstart Scenarios from `001-core-pipeline/quickstart.md` first to confirm
 no regressions, then run these.
 
@@ -19,7 +19,7 @@ ffprobe -v error -select_streams v:0 -show_entries stream=width,height \
   -of csv=p=0 test.mp4
 ```
 
-A high-resolution source (1080p or above) is recommended for Scenario 1 to
+A high-resolution source (1080p or above) is recommended for Scenario 8 to
 confirm visible scaling.
 
 ---
@@ -42,7 +42,8 @@ goblin -frame-max-dim 1280 -no-transcript goblin-test.mp4
 - `MANIFEST.json` contains `"frame_max_dim": 1280`
 
 **No upscale check**: Run with `-frame-max-dim 9999` on a 1080p source and
-confirm frames are written at native 1920×1080, not upscaled.
+confirm frames are written at native 1920×1080, not upscaled. `MANIFEST.json`
+should contain `"frame_max_dim": 9999` (the requested cap, even if not applied).
 
 ---
 
@@ -66,33 +67,10 @@ and confirm pages are 4×4 as before, with no `grid_rows` field in MANIFEST.
 
 ---
 
-## Scenario 10: JPEG Frame Format
+## Scenario 10: Combined Output Control
 
 ```bash
-goblin -frame-format jpg -no-transcript goblin-test.mp4
-```
-
-**Expected**:
-- Exit code 0
-- All files in `goblin-test_goblin/frames/` have `.jpg` extension
-- No `.png` files in `frames/`
-- `MANIFEST.json` scene `frame` paths end in `.jpg`
-- `MANIFEST.json` contains `"frame_format": "jpg"`
-- JPEG files are valid images (open in any image viewer)
-
-**Size check**: Compare total size of `frames/` to a PNG run on the same
-source. JPEG output should be substantially smaller (typically 5–15×).
-
-**Quality override**: Run with `-frame-format jpg -frame-quality 10` and
-confirm the flag is accepted without error (files will be lower quality but
-still valid JPEG).
-
----
-
-## Scenario 11: Combined Output Control
-
-```bash
-goblin -frame-max-dim 1280 -frame-format jpg -frame-quality 3 \
+goblin -frame-max-dim 1280 \
        -grid -grid-cols 6 -grid-rows 3 \
        -model /d/models/whisper-models/ggml-large-v3-turbo.bin \
        goblin-test.mp4
@@ -100,17 +78,13 @@ goblin -frame-max-dim 1280 -frame-format jpg -frame-quality 3 \
 
 **Expected**:
 - Exit code 0
-- All frame files in `frames/` are `.jpg` with longest edge ≤ 1280
-- Grid files in `grids/` are `.png` in a 6×3 layout
+- All frame files in `frames/` are PNG with longest edge ≤ 1280
+- Grid files in `grids/` are PNG in a 6×3 layout
 - `MANIFEST.json` contains:
-  - `"frame_format": "jpg"`
   - `"frame_max_dim": 1280`
   - `"grid_cols": 6`
   - `"grid_rows": 3`
 - Consumer validate script exits 0 on the output
-
-**Consumer validate**: The existing `test/consumer_validate.go` must handle
-`.jpg` frame paths — it should not hardcode `.png` in any path check.
 
 ---
 
@@ -118,10 +92,10 @@ goblin -frame-max-dim 1280 -frame-format jpg -frame-quality 3 \
 
 After implementing 002, all seven original Quickstart Scenarios must still
 pass with no flags changed. Specifically:
-- Scenario 1 (full pipeline): frames are still `.png`, no `frame_format`
-  field in MANIFEST (or `"png"` if always written — check the spec)
+- Scenario 1 (full pipeline): frames are still `.png`, no `frame_max_dim`
+  field in MANIFEST (flag absent → field omitted)
 - Scenario 7 (grid mode): grid pages remain 4×4 when no `-grid-rows` is
-  specified
+  specified, no `grid_rows` field in MANIFEST
 
 ---
 
@@ -131,6 +105,5 @@ pass with no flags changed. Specifically:
 |---|---|
 | SC-001: Dimension cap | Scenario 8 (ffprobe dimension check) |
 | SC-002: Rectangular grid | Scenario 9 (grid image dimension check) |
-| SC-003: JPEG size reduction | Scenario 10 (compare `frames/` sizes) |
-| SC-004: No regressions | All seven original scenarios + default-flag runs |
-| SC-005: Combined flags | Scenario 11 (consumer validate exits 0) |
+| SC-003: No regressions | All seven original scenarios + default-flag runs |
+| SC-004: Combined flags | Scenario 10 (consumer validate exits 0) |

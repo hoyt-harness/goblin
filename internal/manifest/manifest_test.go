@@ -137,6 +137,84 @@ func TestBuildSceneRefsSceneScore(t *testing.T) {
 	}
 }
 
+func TestManifestFrameMaxDim(t *testing.T) {
+	outDir := t.TempDir()
+	base := &Manifest{
+		SchemaVersion: SchemaVersion,
+		GoblinVersion: "0.2.0-test",
+		GeneratedAt:   "2026-08-14T00:00:00Z",
+		SourcePath:    "/test/video.mp4",
+		StagesRun:     []string{"probe"},
+		ProbePath:     "probe.json",
+		Warnings:      []string{},
+		Scenes:        []SceneRef{},
+	}
+
+	// FrameMaxDim=0 — field must be absent (omitempty).
+	base.FrameMaxDim = 0
+	if err := WriteManifest(outDir, base); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(outDir, "MANIFEST.json"))
+	var out map[string]interface{}
+	_ = json.Unmarshal(data, &out)
+	if _, present := out["frame_max_dim"]; present {
+		t.Errorf("frame_max_dim should be absent when 0, got %v", out["frame_max_dim"])
+	}
+
+	// FrameMaxDim=1280 — field must be present and correct.
+	base.FrameMaxDim = 1280
+	outDir2 := t.TempDir()
+	if err := WriteManifest(outDir2, base); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = os.ReadFile(filepath.Join(outDir2, "MANIFEST.json"))
+	_ = json.Unmarshal(data, &out)
+	if v, ok := out["frame_max_dim"]; !ok || v != float64(1280) {
+		t.Errorf("frame_max_dim = %v, want 1280", out["frame_max_dim"])
+	}
+}
+
+func TestManifestGridRows(t *testing.T) {
+	outDir := t.TempDir()
+	m := &Manifest{
+		SchemaVersion: SchemaVersion,
+		GoblinVersion: "0.2.0-test",
+		GeneratedAt:   "2026-08-14T00:00:00Z",
+		SourcePath:    "/test/video.mp4",
+		StagesRun:     []string{"probe"},
+		ProbePath:     "probe.json",
+		GridMode:      true,
+		GridCols:      4,
+		Warnings:      []string{},
+		Scenes:        []SceneRef{},
+	}
+
+	// GridRows=0 (default square) — field must be absent.
+	m.GridRows = 0
+	if err := WriteManifest(outDir, m); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(outDir, "MANIFEST.json"))
+	var out map[string]interface{}
+	_ = json.Unmarshal(data, &out)
+	if _, present := out["grid_rows"]; present {
+		t.Errorf("grid_rows should be absent when 0, got %v", out["grid_rows"])
+	}
+
+	// GridRows=3 (explicit rectangular) — field must be present.
+	m.GridRows = 3
+	outDir2 := t.TempDir()
+	if err := WriteManifest(outDir2, m); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = os.ReadFile(filepath.Join(outDir2, "MANIFEST.json"))
+	_ = json.Unmarshal(data, &out)
+	if v, ok := out["grid_rows"]; !ok || v != float64(3) {
+		t.Errorf("grid_rows = %v, want 3", out["grid_rows"])
+	}
+}
+
 func contains(slice []int, v int) bool {
 	for _, x := range slice {
 		if x == v {

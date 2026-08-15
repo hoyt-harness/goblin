@@ -27,7 +27,8 @@ type Frame struct {
 // Extract runs ffmpeg scene detection on input, writes frame PNGs to outDir/frames/,
 // and returns the ordered scene list and per-frame metadata.
 // threads is passed as -threads to ffmpeg; 0 means ffmpeg auto-selects.
-func Extract(input, outDir string, threshold float64, threads int) ([]Scene, []Frame, error) {
+// maxDim caps the longest edge of each frame in pixels; 0 means no scaling.
+func Extract(input, outDir string, threshold float64, threads int, maxDim int) ([]Scene, []Frame, error) {
 	// Resolve input to absolute so it remains valid when cmd.Dir is set.
 	absInput, err := filepath.Abs(input)
 	if err != nil {
@@ -45,7 +46,7 @@ func Extract(input, outDir string, threshold float64, threads int) ([]Scene, []F
 	metaRel := ".frame-meta"
 	metaPath := filepath.Join(outDir, metaRel)
 
-	filter := fmt.Sprintf(`select=gt(scene\,%s),metadata=print:file=%s`, formatThreshold(threshold), metaRel)
+	filter := buildFilter(threshold, metaRel, maxDim)
 
 	var args []string
 	if threads > 0 {
@@ -77,8 +78,12 @@ func Extract(input, outDir string, threshold float64, threads int) ([]Scene, []F
 		if threads > 0 {
 			fcArgs = append(fcArgs, "-threads", strconv.Itoa(threads))
 		}
+		fcArgs = append(fcArgs, "-i", filepath.ToSlash(input))
+		if maxDim > 0 {
+			scaleFilter := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos", maxDim, maxDim)
+			fcArgs = append(fcArgs, "-vf", scaleFilter)
+		}
 		fcArgs = append(fcArgs,
-			"-i", filepath.ToSlash(input),
 			"-vframes", "1",
 			"-q:v", "2",
 			"-loglevel", "error",
@@ -181,6 +186,14 @@ func parseFrameMeta(path string) ([]rawFrame, error) {
 	}
 
 	return frames, scanner.Err()
+}
+
+func buildFilter(threshold float64, metaRel string, maxDim int) string {
+	f := fmt.Sprintf(`select=gt(scene\,%s),metadata=print:file=%s`, formatThreshold(threshold), metaRel)
+	if maxDim > 0 {
+		f += fmt.Sprintf(`,scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos`, maxDim, maxDim)
+	}
+	return f
 }
 
 func formatThreshold(t float64) string {

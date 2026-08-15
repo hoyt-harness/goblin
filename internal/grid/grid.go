@@ -11,11 +11,11 @@ import (
 )
 
 // Grid creates contact sheet grid images from frame PNGs in outDir/frames/.
-// cols is the number of columns per page; rows per page equals cols (square pages),
-// so each page holds cols×cols frames.
-// Returns forward-slash relative paths to the generated grid files,
-// sorted by filename. Returns nil if no frames are found.
-func Grid(outDir string, cols int) ([]string, error) {
+// cols is the number of columns per page. rows is the number of rows per page;
+// when rows == 0, rows = cols (square pages). Returns forward-slash relative
+// paths to the generated grid files, sorted by filename. Returns nil if no
+// frames are found.
+func Grid(outDir string, cols int, rows int) ([]string, error) {
 	framesDir := filepath.Join(outDir, "frames")
 	entries, err := os.ReadDir(framesDir)
 	if err != nil {
@@ -36,7 +36,9 @@ func Grid(outDir string, cols int) ([]string, error) {
 	if cols < 1 {
 		cols = 1
 	}
-	rows := cols // square pages
+	if rows == 0 {
+		rows = cols
+	}
 
 	gridsDir := filepath.Join(outDir, "grids")
 	if err := os.MkdirAll(gridsDir, 0o755); err != nil {
