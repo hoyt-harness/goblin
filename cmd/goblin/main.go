@@ -204,7 +204,11 @@ func run() int {
 
 		// Stage: grid (runs immediately after extract while frames are fresh).
 		if cfg.Grid {
-			progress(cfg.Quiet, "goblin: grid  %dx%d per page", cfg.GridCols, cfg.GridCols)
+			gridRows := cfg.GridRows
+			if gridRows == 0 {
+				gridRows = cfg.GridCols
+			}
+			progress(cfg.Quiet, "goblin: grid  %dx%d per page", cfg.GridCols, gridRows)
 			var gridErr error
 			gridPaths, gridErr = grid.Grid(cfg.Output, cfg.GridCols, cfg.GridRows)
 			if gridErr != nil {
