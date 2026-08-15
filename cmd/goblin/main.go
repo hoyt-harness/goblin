@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	goblinpkg "github.com/hoyt-harness/goblin"
 	"github.com/hoyt-harness/goblin/internal/extract"
 	"github.com/hoyt-harness/goblin/internal/grid"
 	"github.com/hoyt-harness/goblin/internal/manifest"
@@ -46,6 +47,7 @@ func main() {
 func run() int {
 	var cfg Config
 	var showVersion bool
+	var showGuide bool
 
 	flag.StringVar(&cfg.Output, "output", "", "Output directory path (default: <FILE_basename>_goblin/ next to FILE)")
 	flag.Float64Var(&cfg.Threshold, "threshold", 0.4, "Scene detection sensitivity (0.0–1.0)")
@@ -64,6 +66,7 @@ func run() int {
 	flag.IntVar(&cfg.Threads, "threads", 0, "Thread count hint for ffmpeg and whisper (0 = auto)")
 	flag.BoolVar(&cfg.Quiet, "quiet", false, "Suppress progress lines; errors and warnings always print")
 	flag.BoolVar(&showVersion, "version", false, "Print version and exit 0")
+	flag.BoolVar(&showGuide, "guide", false, "Print the full usage guide (USING.md) and exit 0")
 
 	flag.Usage = func() {
 		fmt.Printf("goblin %s\n\nUsage: goblin [flags] FILE\n\nFlags:\n", version)
@@ -75,6 +78,10 @@ func run() int {
 
 	if showVersion {
 		fmt.Println(version)
+		return 0
+	}
+	if showGuide {
+		fmt.Print(goblinpkg.Guide)
 		return 0
 	}
 

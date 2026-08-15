@@ -10,9 +10,8 @@ beyond external CLI tools (ffprobe, ffmpeg, whisper.cpp or equivalent).
 ## Build
 
 ```sh
-make build
-# or
-go build -ldflags "-X main.version=$(git describe --tags --abbrev=0)" -o bin/goblin ./cmd/goblin
+make build           # current platform
+make build-all       # all four platforms (windows/linux/darwin ×amd64/arm64)
 ```
 
 ## Test
@@ -55,6 +54,7 @@ Generate test fixture: `bash test/fixtures/gen.sh`
 | `-threads N` | 0 | Thread count for ffmpeg and whisper (0 = auto) |
 | `-quiet` | false | Suppress progress lines |
 | `-whisper-cmd NAME` | `$GOBLIN_WHISPER_CMD` or `whisper-cli` | Whisper binary |
+| `-guide` | — | Print full usage guide (USING.md, embedded at build time) and exit 0 |
 | `-version` | — | Print version and exit 0 |
 
 ## Output structure

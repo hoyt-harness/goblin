@@ -21,6 +21,14 @@ make build
 go build -o bin/goblin ./cmd/goblin
 ```
 
+Pre-built binaries for Windows, Linux, and macOS are attached to each
+[GitHub release](https://github.com/hoyt-harness/goblin/releases).
+
+Cross-compile all platforms:
+```sh
+make build-all
+```
+
 ## Usage
 
 ```sh
@@ -49,4 +57,9 @@ video_goblin/
     └── ...
 ```
 
-See `USING.md` for the full flag reference and worked examples.
+See `USING.md` for the full flag reference and worked examples, including
+a strategy guide for AI agents. The guide is also embedded in the binary:
+
+```sh
+goblin -guide
+```
