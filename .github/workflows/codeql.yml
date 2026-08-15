@@ -17,14 +17,14 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor != 'dependabot[bot]'
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: github/codeql-action/init@c4dd10e4d873808a4a7e5157804cc2c8afe2e5f6 # v3.27.6
+      - uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           languages: go
 
-      - uses: github/codeql-action/autobuild@c4dd10e4d873808a4a7e5157804cc2c8afe2e5f6 # v3.27.6
+      - uses: github/codeql-action/autobuild@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
 
-      - uses: github/codeql-action/analyze@c4dd10e4d873808a4a7e5157804cc2c8afe2e5f6 # v3.27.6
+      - uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           category: "/language:go"
