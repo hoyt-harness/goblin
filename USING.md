@@ -238,6 +238,142 @@ array. All indices are guaranteed in-bounds when the manifest is written.
 
 ---
 
+## Strategy for AI agents
+
+This section is written for the AI consuming goblin's output, not for the human
+running it. If you are an AI agent with goblin on your PATH, read this before
+your first invocation on any new video.
+
+### 1. Probe before you commit
+
+Always run probe-only first:
+
+```sh
+goblin -probe-only -output /tmp/probe video.mp4
+```
+
+The probe takes under a second and tells you everything you need to plan the
+full run: source resolution, duration, codec, whether the file has audio, and
+whether embedded subtitles exist. Without this, you are guessing at how much
+the full run will cost you.
+
+From probe output, decide:
+- What `-frame-max-dim` to set (see §2 below)
+- Whether to skip transcription (`-no-transcript`) — if `has_audio` is false,
+  or if the question is purely visual, skip it
+- Whether to skip frames (`-no-frames`) — if the question is purely about
+  speech content, skipping frames saves significant time
+- A rough estimate of scene count: `duration_s / 10` is a loose lower bound
+  at the default threshold; adjust expectations for action-heavy or static content
+
+### 2. Set frame-max-dim from your context budget
+
+Token cost for images is determined by pixel dimensions, not file size. Claude
+tiles images into 750×750-pixel cells; each tile costs a fixed number of tokens.
+
+Formula for a 16:9 source capped at N pixels (longest edge):
+
+```
+width  = N
+height = N × 9/16
+tiles  = ceil(N/750) × ceil(height/750)
+```
+
+Common values:
+
+| `-frame-max-dim` | Frame size (16:9) | Tiles | Approximate tokens |
+|---|---|---|---|
+| 0 (4K source) | 3840×2160 | 18 | ~29,000 |
+| 0 (1080p source) | 1920×1080 | 6 | ~9,600 |
+| 1280 | 1280×720 | 2 | ~3,200 |
+| 640 | 640×360 | 1 | ~1,600 |
+
+For a video with 40 scenes at 1280px: 40 × 3,200 ≈ 128,000 tokens in frames alone,
+before any text. At 640px: 40 × 1,600 ≈ 64,000 tokens. Choose the cap that
+leaves room for your analysis within your context budget.
+
+Scene recognition works reliably at 1280px for most content. Use 640px when
+you need to fit many scenes and the question does not require reading text or
+fine detail.
+
+### 3. Read MANIFEST.json first; load frames selectively
+
+After the run, read `MANIFEST.json` before opening any frame files. The manifest
+gives you the complete scene index — timestamps, transcript cross-links, grid
+references, and frame paths — at negligible cost. From it you can identify
+which specific scenes are relevant to the question and load only those frames.
+
+Loading all frames upfront is almost always the wrong move. A 90-minute video
+at the default threshold can produce 200+ scenes.
+
+### 4. Use transcript_segments — it is already cross-linked
+
+Each scene in the manifest has a `transcript_segments` array. These are
+indices into `transcript.json`'s `segments` array. The cross-linking is done
+at write time by goblin; you do not need to scan the transcript yourself and
+match timestamps. Read the relevant segment objects directly by index.
+
+```json
+// MANIFEST scene:
+{ "index": 5, "start_s": 62.1, "end_s": 71.4,
+  "transcript_segments": [12, 13] }
+
+// transcript.json segment 12:
+{ "index": 12, "start_s": 61.0, "end_s": 66.3, "text": "..." }
+```
+
+### 5. Tune the threshold for the question
+
+The default threshold (0.4) is calibrated for general-purpose content. Adjust
+when the question demands it:
+
+- **Lower (0.2–0.3)**: more scenes, finer temporal resolution — use when you
+  need to find a specific moment, read something on screen, or analyze rapid
+  visual changes
+- **Higher (0.5–0.7)**: fewer scenes, coarser — use when you need a structural
+  overview of a long video and scene count is the binding cost constraint
+
+If you overshoot (too many frames), the `-frame-warn` threshold will alert you.
+Re-run with a higher threshold rather than loading all frames anyway.
+
+### 6. Grid for scanning; individual frames for detail
+
+Grid contact sheets (produced with `-grid`) pack multiple frames per image.
+Use them for rapid scanning — "what is the general visual rhythm of this
+video?" or "which section contains the diagram I'm looking for?" — and then
+load the individual frame from that scene for detail work. Grid thumbnails are
+too small to read text or identify faces reliably.
+
+### 7. Suggested invocation patterns
+
+**"What is this video about?"** — structural overview of unknown content:
+```sh
+goblin -probe-only -output /tmp/p video.mp4
+# → read resolution, duration; decide frame-max-dim
+goblin -frame-max-dim 640 -grid -grid-cols 6 -grid-rows 3 \
+       -model $GOBLIN_WHISPER_MODEL video.mp4
+# → read MANIFEST, skim grid pages, read transcript summary
+```
+
+**"What happens at [timestamp]?"** — targeted moment lookup:
+```sh
+goblin -probe-only -output /tmp/p video.mp4
+goblin -frame-max-dim 1280 -threshold 0.2 -no-transcript video.mp4
+# → read MANIFEST, find scenes bracketing the timestamp, load those frames
+```
+
+**"Transcribe and summarize this talk"** — speech-primary content:
+```sh
+goblin -no-frames -model $GOBLIN_WHISPER_MODEL talk.mp4
+# → read transcript.json directly; no frame cost at all
+```
+
+**"Find the slide showing X"** — text on screen:
+```sh
+goblin -frame-max-dim 1280 -threshold 0.2 -no-transcript slides.mp4
+# → read MANIFEST, load frames in suspected range; 1280px needed to read text
+```
+
 ## Troubleshooting
 
 See `BUGS` for known issues and workarounds.
