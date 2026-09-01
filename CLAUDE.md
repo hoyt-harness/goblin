@@ -97,7 +97,4 @@ Example: `-frame-max-dim 1280` reduces a 4K frame from ~30,000 tokens to
 - Scene 0 starts at first detected change (not necessarily t=0) — content
   before the first scene change has no representative frame
 
-Vault documentation: `C:\Users\hoyth\Obsidian\Positronikal\03-OPERATIONS\Engineering\`
-
-Standards: `D:\Engineering\PositronikalCodingStandards\standards\`
-Coding Bible: `D:\Engineering\_references\CODING_BIBLE.md`
+Standards: https://github.com/Positronikal/PositronikalCodingStandards/tree/main/standards/
