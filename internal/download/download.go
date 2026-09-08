@@ -32,7 +32,11 @@ func Download(url, outDir, ytdlpPath string, maxHeight int) (string, error) {
 		bin = ytdlpPath
 	}
 
-	outputTemplate := filepath.Join(outDir, "%(title)s.%(ext)s")
+	// Use video ID (not title) to guarantee an ASCII filename with no special
+	// characters. Title-based names can contain full-width punctuation or other
+	// Unicode that causes path handling issues downstream (e.g. full-width colon
+	// U+FF1A from YouTube title sanitization on Windows).
+	outputTemplate := filepath.Join(outDir, "%(id)s.%(ext)s")
 
 	args := []string{
 		"-f", buildFormatString(maxHeight),
