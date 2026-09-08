@@ -30,6 +30,7 @@ type Manifest struct {
 	GoblinVersion  string     `json:"goblin_version"`
 	GeneratedAt    string     `json:"generated_at"`
 	SourcePath     string     `json:"source_path"`
+	SourceURL      string     `json:"source_url,omitempty"`
 	DurationS      float64    `json:"duration_s"`
 	StagesRun      []string   `json:"stages_run"`
 	ProbePath      string     `json:"probe_path"`

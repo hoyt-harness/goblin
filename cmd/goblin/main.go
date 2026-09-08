@@ -11,6 +11,7 @@ import (
 	"time"
 
 	goblinpkg "github.com/hoyt-harness/goblin"
+	"github.com/hoyt-harness/goblin/internal/download"
 	"github.com/hoyt-harness/goblin/internal/extract"
 	"github.com/hoyt-harness/goblin/internal/grid"
 	"github.com/hoyt-harness/goblin/internal/manifest"
@@ -38,6 +39,8 @@ type Config struct {
 	FrameWarn     int
 	Threads       int
 	Quiet         bool
+	YtDlpPath     string
+	MaxHeight     int
 }
 
 func main() {
@@ -65,13 +68,16 @@ func run() int {
 	flag.IntVar(&cfg.FrameWarn, "frame-warn", 50, "Warn if output frame count exceeds N")
 	flag.IntVar(&cfg.Threads, "threads", 0, "Thread count hint for ffmpeg and whisper (0 = auto)")
 	flag.BoolVar(&cfg.Quiet, "quiet", false, "Suppress progress lines; errors and warnings always print")
+	flag.StringVar(&cfg.YtDlpPath, "ytdlp-path", "", "Path to yt-dlp binary (default: PATH lookup)")
+	flag.IntVar(&cfg.MaxHeight, "max-height", 720, "Cap download height in pixels; 0 = best available (URL input only)")
 	flag.BoolVar(&showVersion, "version", false, "Print version and exit 0")
 	flag.BoolVar(&showGuide, "guide", false, "Print the full usage guide (USING.md) and exit 0")
 
 	flag.Usage = func() {
-		fmt.Printf("goblin %s\n\nUsage: goblin [flags] FILE\n\nFlags:\n", version)
+		fmt.Printf("goblin %s\n\nUsage: goblin [flags] FILE|URL\n\nFlags:\n", version)
 		flag.PrintDefaults()
 		fmt.Println("\nPrerequisites: ffprobe, ffmpeg, whisper-cli (or set GOBLIN_WHISPER_CMD)")
+		fmt.Println("URL input also requires: yt-dlp (https://github.com/yt-dlp/yt-dlp)")
 	}
 
 	flag.Parse()
@@ -110,23 +116,32 @@ func run() int {
 	// Positional argument validation.
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "goblin: error: FILE argument required\n")
+		fmt.Fprintf(os.Stderr, "goblin: error: FILE|URL argument required\n")
 		flag.Usage()
 		return 1
 	}
 	if len(args) > 1 {
-		fmt.Fprintf(os.Stderr, "goblin: error: exactly one FILE argument required, got %d\n", len(args))
+		fmt.Fprintf(os.Stderr, "goblin: error: exactly one FILE|URL argument required, got %d\n", len(args))
 		return 1
 	}
 	inputFile := args[0]
 
-	if _, err := os.Stat(inputFile); err != nil {
-		fmt.Fprintf(os.Stderr, "goblin: error: cannot read %s: %v\n", inputFile, err)
-		return 3
+	isURL := strings.HasPrefix(inputFile, "http://") || strings.HasPrefix(inputFile, "https://")
+
+	if isURL {
+		if cfg.Output == "" {
+			fmt.Fprintf(os.Stderr, "goblin: error: -output is required when input is a URL\n")
+			return 1
+		}
+	} else {
+		if _, err := os.Stat(inputFile); err != nil {
+			fmt.Fprintf(os.Stderr, "goblin: error: cannot read %s: %v\n", inputFile, err)
+			return 3
+		}
 	}
 
 	// Tool presence checks.
-	if code := checkTools(&cfg); code != 0 {
+	if code := checkTools(&cfg, isURL); code != 0 {
 		return code
 	}
 
@@ -140,6 +155,20 @@ func run() int {
 		return code
 	}
 
+	// Stage: download (URL input only).
+	sourceURL := ""
+	if isURL {
+		sourceURL = inputFile
+		progress(cfg.Quiet, "goblin: download  %s", inputFile)
+		downloaded, err := download.Download(inputFile, cfg.Output, cfg.YtDlpPath, cfg.MaxHeight)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "goblin: error: download failed: %v\n", err)
+			return 2
+		}
+		inputFile = downloaded
+		progress(cfg.Quiet, "goblin: download  saved %s", filepath.Base(downloaded))
+	}
+
 	// Pipeline.
 	absInput, _ := filepath.Abs(inputFile)
 
@@ -148,6 +177,7 @@ func run() int {
 		GoblinVersion: version,
 		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
 		SourcePath:    absInput,
+		SourceURL:     sourceURL,
 		ProbePath:     "probe.json",
 		Warnings:      []string{},
 		StagesRun:     []string{},
@@ -300,7 +330,11 @@ func run() int {
 	return 0
 }
 
-func checkTools(cfg *Config) int {
+func checkTools(cfg *Config, isURL bool) int {
+	ytdlpBin := "yt-dlp"
+	if cfg.YtDlpPath != "" {
+		ytdlpBin = cfg.YtDlpPath
+	}
 	tools := []struct {
 		name string
 		hint string
@@ -309,6 +343,7 @@ func checkTools(cfg *Config) int {
 		{"ffprobe", "Install the FFmpeg suite: https://ffmpeg.org/download.html", false},
 		{"ffmpeg", "Install the FFmpeg suite: https://ffmpeg.org/download.html", cfg.ProbeOnly},
 		{cfg.WhisperCmd, "Install whisper.cpp: https://github.com/ggerganov/whisper.cpp", cfg.ProbeOnly || cfg.NoTranscript},
+		{ytdlpBin, "Install yt-dlp: https://github.com/yt-dlp/yt-dlp", !isURL},
 	}
 	for _, t := range tools {
 		if t.skip {

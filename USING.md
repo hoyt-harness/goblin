@@ -17,6 +17,16 @@ ffmpeg     (FFmpeg suite)
 whisper-cli (whisper.cpp — https://github.com/ggerganov/whisper.cpp)
 ```
 
+For URL input (YouTube and other yt-dlp-supported sources), also required:
+
+```
+yt-dlp     (https://github.com/yt-dlp/yt-dlp)
+```
+
+yt-dlp does not require an API key or authentication for public videos.
+Note: yt-dlp requires periodic updates when YouTube changes its internal
+endpoints — install the standalone binary and update with `yt-dlp -U`.
+
 A whisper model file is also required. Download one from the whisper.cpp
 releases or Hugging Face. The large-v3-turbo model is a good default for most
 content:
@@ -135,7 +145,34 @@ costs fewer tokens for the same scene coverage.
 `MANIFEST.json` will contain `"grid_rows": 3` when explicitly set.
 Omitted when using default square pages (`grid_rows == grid_cols`).
 
-### 5. Embedded subtitle extraction (MKV files)
+### 5. URL input — YouTube and other yt-dlp-supported sources
+
+`-output` is required when the input is a URL (no local file, no default path):
+
+```sh
+goblin \
+  -model /path/to/ggml-large-v3-turbo.bin \
+  -output tutorial_goblin \
+  -frame-max-dim 1280 \
+  -grid \
+  "https://www.youtube.com/watch?v=VIDEO_ID"
+```
+
+Goblin downloads the video into `tutorial_goblin/` using yt-dlp, then runs
+the full pipeline on the downloaded file. The downloaded video is retained.
+`MANIFEST.json` will contain `"source_url"` with the original URL.
+
+To cap download quality (default 720p) or specify the yt-dlp binary path:
+
+```sh
+goblin -max-height 1080 -ytdlp-path /path/to/yt-dlp \
+  -output tutorial_goblin -model /path/to/model.bin \
+  "https://www.youtube.com/watch?v=VIDEO_ID"
+```
+
+Use `-max-height 0` to download the best available quality with no cap.
+
+### 6. Embedded subtitle extraction (MKV files)
 
 ```sh
 goblin -model /path/to/model.bin subtitled.mkv
@@ -171,6 +208,8 @@ goblin -prefer-whisper -model /path/to/model.bin subtitled.mkv
 | `-threads N` | 0 | Thread count hint for ffmpeg and whisper (0 = auto) |
 | `-whisper-cmd NAME` | `whisper-cli` or `$GOBLIN_WHISPER_CMD` | Whisper binary |
 | `-quiet` | false | Suppress progress lines (errors always print) |
+| `-ytdlp-path PATH` | PATH lookup | Explicit path to yt-dlp binary (URL input only) |
+| `-max-height N` | 720 | Cap download height in pixels; 0 = best available (URL input only) |
 | `-version` | — | Print version and exit 0 |
 
 ---

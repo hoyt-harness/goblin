@@ -215,6 +215,45 @@ func TestManifestGridRows(t *testing.T) {
 	}
 }
 
+func TestManifestSourceURL(t *testing.T) {
+	outDir := t.TempDir()
+	base := &Manifest{
+		SchemaVersion: SchemaVersion,
+		GoblinVersion: "0.3.0-test",
+		GeneratedAt:   "2026-09-08T00:00:00Z",
+		SourcePath:    "/tmp/downloaded.mp4",
+		StagesRun:     []string{"probe"},
+		ProbePath:     "probe.json",
+		Warnings:      []string{},
+		Scenes:        []SceneRef{},
+	}
+
+	// SourceURL set — field must be present in JSON.
+	base.SourceURL = "https://www.youtube.com/watch?v=TESTID"
+	if err := WriteManifest(outDir, base); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(outDir, "MANIFEST.json"))
+	var out map[string]interface{}
+	_ = json.Unmarshal(data, &out)
+	if v, ok := out["source_url"]; !ok || v != "https://www.youtube.com/watch?v=TESTID" {
+		t.Errorf("source_url = %v, want the YouTube URL", out["source_url"])
+	}
+
+	// SourceURL empty — field must be absent (omitempty); regression for local-file runs.
+	base.SourceURL = ""
+	outDir2 := t.TempDir()
+	if err := WriteManifest(outDir2, base); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = os.ReadFile(filepath.Join(outDir2, "MANIFEST.json"))
+	var out2 map[string]interface{}
+	_ = json.Unmarshal(data, &out2)
+	if _, present := out2["source_url"]; present {
+		t.Errorf("source_url should be absent when empty, got %v", out2["source_url"])
+	}
+}
+
 func contains(slice []int, v int) bool {
 	for _, x := range slice {
 		if x == v {

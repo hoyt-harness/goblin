@@ -4,6 +4,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -57,8 +58,29 @@ func TestCheckToolsMissingTool(t *testing.T) {
 	cfg := &Config{
 		WhisperCmd: "goblin-nonexistent-tool-xxxxxx",
 	}
-	code := checkTools(cfg)
+	code := checkTools(cfg, false)
 	if code != 2 {
 		t.Errorf("missing tool: got code=%d; want 2", code)
+	}
+}
+
+func TestURLDetection(t *testing.T) {
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{"https://www.youtube.com/watch?v=abc123", true},
+		{"http://example.com/video.mp4", true},
+		{"https://youtu.be/abc123", true},
+		{"/local/path/to/video.mp4", false},
+		{"D:/Engineering/goblin/test/video.mp4", false},
+		{"relative/path.mp4", false},
+		{"//network/share/video.mp4", false},
+	}
+	for _, c := range cases {
+		got := strings.HasPrefix(c.input, "http://") || strings.HasPrefix(c.input, "https://")
+		if got != c.want {
+			t.Errorf("isURL(%q) = %v, want %v", c.input, got, c.want)
+		}
 	}
 }
