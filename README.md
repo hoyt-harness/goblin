@@ -1,15 +1,17 @@
 # goblin
 
-Goblin is a media analysis pipeline for Claude. It extracts scene-change
-keyframes and a timestamped transcript from a local video or audio file,
-then writes a structured MANIFEST directory that Claude and editing tools
-can consume directly.
+Goblin is a media analysis pipeline for Claude. Give it a local video or
+audio file, or a YouTube URL, and it extracts scene-change keyframes and a
+timestamped transcript, then writes a structured MANIFEST directory that
+Claude and editing tools can consume directly.
 
 ## Prerequisites
 
 - [ffprobe / ffmpeg](https://ffmpeg.org/) — frame extraction and audio processing
 - [whisper.cpp](https://github.com/ggerganov/whisper.cpp) — speech-to-text
   (`whisper-cli` on PATH, or set `GOBLIN_WHISPER_CMD`)
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) (optional) — YouTube and URL input
+  (`yt-dlp` on PATH, or set `-ytdlp-path`)
 - [mkvextract](https://mkvtoolnix.download/) (optional) — embedded subtitle
   extraction from MKV files
 
@@ -34,6 +36,9 @@ make build-all
 ```sh
 # Full pipeline (frames + transcript)
 goblin -model /path/to/ggml-large-v3-turbo.bin video.mp4
+
+# YouTube URL (downloads via yt-dlp, then runs full pipeline)
+goblin -model /path/to/ggml-large-v3-turbo.bin https://www.youtube.com/watch?v=...
 
 # Probe only (metadata, no extraction)
 goblin -probe-only video.mp4
