@@ -24,3 +24,6 @@ Thumbs.db
 # Profiling
 *.prof
 .claude/CLAUDE.md
+
+# Claude Code local permissions (may contain secrets)
+.claude/settings.local.json
