@@ -2,10 +2,14 @@ VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0-dev
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 BINARY  := bin/goblin
 
-.PHONY: build build-all test clean
+.PHONY: build build-all install-local test clean
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) ./cmd/goblin
+
+install-local:
+	go build $(LDFLAGS) -o bin/goblin.exe ./cmd/goblin
+	cp bin/goblin.exe ~/.local/bin/goblin.exe
 
 build-all:
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o bin/goblin-$(VERSION)-windows-amd64.exe ./cmd/goblin
